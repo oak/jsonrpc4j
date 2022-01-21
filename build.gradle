@@ -16,13 +16,8 @@ buildscript {
     }
 
     dependencies {
-        classpath "io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.5.3"
         classpath("com.adarshr:gradle-test-logger-plugin:1.6.0")
     }
-}
-
-plugins {
-    id('jacoco')
 }
 
 repositories {
@@ -33,10 +28,14 @@ repositories {
 }
 
 apply plugin: "java"
+apply plugin: 'jacoco'
+apply plugin: 'maven'
+apply plugin: 'signing'
 apply plugin: "com.adarshr.test-logger"
 
-group = "com.github.briandilley.jsonrpc4j"
-version = "1.6.1-SNAPSHOT"
+group = "io.github.oak"
+archivesBaseName = "jsonrpc4j"
+version = "1.6.1-oak"
 description = """
 This project aims to provide the facility to easily implement JSON-RPC for the java programming language.
 """
@@ -47,10 +46,6 @@ targetCompatibility = 1.8
 compileJava {
     options.encoding = 'UTF-8'
     options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
-}
-
-ext {
-    releaseVersion = !version.toString().endsWith('-SNAPSHOT')
 }
 
 test {
@@ -108,6 +103,7 @@ dependencies {
 
     implementation 'commons-codec:commons-codec:1.10'
     implementation 'org.apache.httpcomponents:httpcore-nio:4.4.5'
+    implementation 'javax.jws:javax.jws-api:1.1'
 
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.easymock:easymock:3.4'
@@ -126,19 +122,84 @@ dependencies {
 
 }
 
-
-task documentationJar(type: Jar) {
-    archiveClassifier.set("javadoc")
+task javadocJar(type: Jar) {
+    classifier = 'javadoc'
     from javadoc
 }
 
 task sourcesJar(type: Jar) {
-    archiveClassifier.set("sources")
+    classifier = 'sources'
     from sourceSets.main.allSource
 }
 
 artifacts {
-    archives documentationJar, sourcesJar
+    archives javadocJar, sourcesJar
 }
 
-apply from: 'publishing.gradle'
+
+signing {
+    sign configurations.archives
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            repository(url: "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            snapshotRepository(url: "https://s01.oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+        
+            pom.project {
+                name = rootProject.name.capitalize() + (project.parent ? " ($shortName)" : '')
+                description = project.description
+                url = 'https://github.com/oak/jsonrpc4j'
+                issueManagement {
+                    system = 'GitHub'
+                    url = 'https://github.com/oak/jsonrpc4j/issues'
+                }
+                ciManagement {
+                    system = 'Github Actions'
+                    url = 'https://github.com/oak/jsonrpc4j/actions'
+                }
+                inceptionYear = '2013'
+                developers {
+                    developer {
+                        id = 'briandilley'
+                        name = 'Brian Dilley'
+                        email = 'brian.dilley@gmail.com.com'
+                        url = 'https://github.com/briandilley'
+                        timezone = 'America/Los_Angeles'
+                    }
+                    developer {
+                        id = 'oak'
+                        name = 'Alexandre Carvalho'
+                        email = 'adcarvalho@gmail.com'
+                        url = 'https://github.com/oak'
+                        timezone = 'America/Sao_Paulo'
+                    }
+                }
+                licenses {
+                    license {
+                        name = 'The MIT License (MIT)'
+                        url = 'https://github.com/oak/jsonrpc4j/blob/master/LICENSE'
+                        distribution = 'repo'
+                        comments = 'A business-friendly OSS license'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/oak/jsonrpc4j.git'
+                    developerConnection = 'git@github.com:oak/jsonrpc4j.git'
+                    url = 'https://github.com/oak/jsonrpc4j'
+                }
+                distributionManagement {
+                    downloadUrl = 'https://github.com/oak/jsonrpc4j/releases'
+                }
+            }
+        }
+    }
+}
